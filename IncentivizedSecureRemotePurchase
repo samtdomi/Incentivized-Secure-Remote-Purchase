@@ -1,0 +1,55 @@
+pragma solidity ^0.8.11;
+
+contract purchaseAgreement {
+
+    address payable public seller;
+    address payable public buyer;
+    uint public value;
+    enum State {Created, Locked, Release}
+    State public state;
+    uint public depositAmount;
+    bool receivedItem;
+    
+
+    constructor() payable {
+        seller = payable(msg.sender);
+        receivedItem = false;
+        state = State.Created;
+    }
+
+    // Only the seller of the item, sets the purchase price 
+    function setPrice(uint _value) public {
+        require(msg.sender == seller);
+        require(state == State.Created);
+        value = _value;
+        depositAmount = value * 2;
+    }
+
+    // Buyer must send in double the asking price, thus changing the contract to a 
+    // locked state and no one else can buy the item 
+    function confirmPurchase() external payable {
+        require(state == State.Created, "Item is already sold");
+        require(depositAmount == msg.value, "You must deposit double the asking price");
+        buyer = payable(msg.sender);    
+        state = State.Locked;
+    }
+
+    // Buyer confirms they received the Item, thus releasing the contract and funds
+    function confirmReceived(bool _receivedItem) external {
+        require(msg.sender == buyer, "only the buyer can confirm a received item");
+        receivedItem = _receivedItem;
+        require(receivedItem == true);
+        state = State.Release;
+        paySeller();
+    }
+
+    // Deposit split into refundable deposit amount going back to the 
+    // buyer and purchase amount of the item going to the seller
+    function paySeller() public payable {
+        require(state == State.Release);
+        uint profit = depositAmount / 2 ; 
+        depositAmount /= 2;
+        seller.transfer(profit);
+        buyer.transfer(depositAmount);
+    }
+}
