@@ -1,0 +1,59 @@
+// SPDX-License_Identifier: Unlicensed
+
+pragma solidity ^0.8.7;
+
+contract HotelBooking{
+
+    // identify the owner of the hotel 
+    address payable owner;
+
+    // status of the hotel room
+    enum Status { Vacant, Occupied }
+    Status status;
+
+    uint public price;
+
+
+    constructor () {
+        owner = payable(msg.sender);
+        status = Status.Vacant;
+
+    }
+
+    modifier onlyOwner() {
+        require(msg.sender == owner);
+        _;
+    }
+
+    modifier onlyVacant() {
+        require(status == Status.Vacant, "Hotel room is occupied");
+        _;
+    }
+
+    modifier onlyOccupied() {
+        require(status == Status.Occupied, "Hotel room is vacant");
+        _;
+    }
+
+    modifier correctAmount() {
+        require(msg.value == price, "You must deposit the price of the room");
+        _;
+    }
+
+    event someoneBooked(address _address, uint _price);
+
+    // declare the price of the hotel room
+    function setPrice(uint _price) public onlyOwner() onlyVacant() {
+        price = _price;
+    }
+
+    // Function that books the hotel room
+    function bookTheRoom() public payable onlyVacant() correctAmount() {
+        status = Status.Occupied;
+        // send currency to the owner
+        (bool sent, bytes memory data) = owner.call{value: msg.value}("");
+        require(sent == true);
+        emit someoneBooked(msg.sender, msg.value);
+    }
+
+}
