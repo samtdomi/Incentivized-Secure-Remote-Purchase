@@ -1,0 +1,83 @@
+// SPDX-License_Identifier: Unlicensed
+
+pragma solidity ^0.8.7;
+
+contract VendingMachine {
+
+    address payable owner;
+
+    // Mapping that will identify each item by its name
+    mapping(string => Item) public items;
+    
+    // Struct defining particulars for each item in the machine 
+    struct Item {
+        string name;
+        uint price;
+        uint balance;
+        uint InitiallyStockedBalanced;
+    }
+
+    enum State { Locked, Release } 
+    State  state;
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Only the owner of the vending machine can make changes ");
+        _;
+    }
+
+    modifier correctAmount(string memory _name) {
+        require(items[_name].price == msg.value, "You must send the amount of the item");
+        _;
+    }
+
+    modifier itemAvailable(string memory _name) {
+        require(items[_name].balance > 0, "Item is out of stock");
+        _;
+    }
+
+    modifier minimumAmount(uint _balance) {
+        require(_balance >= 10, "Intial stock must be atleast 10 units per item");
+        _;
+    }
+    
+    event restockTime(uint amountNeeded, string name);
+
+    // Sets the owner of the vending machine
+    constructor() payable {
+        owner = payable(msg.sender);
+
+    }
+
+    // Add item and its particulars to the vending machine available for purchase
+    // Converts price to an Ether value so msg.value works when called
+    function addItem(string memory _name, uint _price, uint _balance) public onlyOwner() minimumAmount(_balance) { 
+        items[_name] = Item(_name, _price * 1 ether, _balance, _balance) ;
+    }
+
+    // Customer purcahses an item
+    function Purchase(string memory _name) public payable correctAmount(_name) itemAvailable(_name) {
+        
+        // Funds transfer to the owner of the vending machine and verifies if successfully sent
+        (bool sent, bytes memory data) = owner.call{value: msg.value}("");
+        require(sent == true);
+
+        // Changes the state of the vending machine to release to signal the release of the item to customer
+        state = State.Release;
+
+        // The quantity of the purchased item is reduced by 1
+        items[_name].balance -= 1;
+
+        if(items[_name].balance < 10){
+            restockItem(_name);
+        }
+
+    }
+
+    // Function that calls for the restock of an item
+    function restockItem(string memory _name) internal {
+        uint amountNeeded = items[_name].InitiallyStockedBalanced - items[_name].balance;
+        emit restockTime(amountNeeded, _name);
+    }
+
+
+}
