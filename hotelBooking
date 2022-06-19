@@ -36,15 +36,15 @@ contract HotelBooking{
     }
 
     modifier correctAmount() {
-        require(msg.value == price, "You must deposit the price of the room");
+        require(msg.value == price , "You must deposit the price of the room");
         _;
     }
 
     event someoneBooked(address _address, uint _price);
 
-    // declare the price of the hotel room
+    // declare the price of the hotel room AND CONVERT THE VALUE TO AN ETHER VALUE so msg.value can work
     function setPrice(uint _price) public onlyOwner() onlyVacant() {
-        price = _price;
+        price = _price * 1 ether;
     }
 
     // Function that books the hotel room
