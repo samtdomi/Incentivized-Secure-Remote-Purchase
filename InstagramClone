@@ -1,0 +1,50 @@
+// SPDX-License_Identifier: Unlicensed
+
+pragma solidity ^0.8.7;
+
+contract InstagramClone {
+
+    // Store Images 
+    mapping(uint => Image) public images;
+    
+    struct Image {
+        uint id;
+        string hash;
+        uint tipAmount;
+        address payable author;
+    }
+
+    // Created variable to increment and use dynamically as Image identifier
+    uint imageCount = 0;
+
+    // Event that will trigger once an image author is successfully sent funds
+    event tipped(address author, uint amount);
+
+
+    // Add image to blockchain from IPFS using IPFS Hash Value
+    function addImage(string memory _hash) public {
+        
+        require(bytes(_hash).length > 0);
+        require(msg.sender != address(0x0));
+
+        imageCount += 1;
+        
+        images[imageCount] = Image(imageCount, _hash, 0 * 1 ether, payable(msg.sender));
+
+    }
+
+    // Tip Image Author
+    function tipAuthor(uint _id) public payable {
+
+        // Sends the image author funds and requires it to be sent successfully before adding tipped amount to image tip amount
+        (bool sent , bytes memory data) = images[_id].author.call{value : msg.value}("");
+        require(sent == true);
+
+        // Adds the tipped amount to the images total tip amount
+        images[_id].tipAmount += msg.value;
+
+        // Emits event showing the author address and tip amount
+        emit tipped(images[_id].author, msg.value);
+
+    }
+}
