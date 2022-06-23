@@ -12,7 +12,7 @@ contract Lottery {
     uint price;
 
     // Creates an array of the addresses of each player
-    address[] payable playerArray;
+    address payable[] playerArray;
 
 // Constructor Function  
     // Sets the owner and price of lottery admission 
