@@ -1,0 +1,85 @@
+// SPDX-License_Identifier: Unlicensed
+
+pragma solidity ^0.8.7;
+
+contract Lottery {
+
+// State Variables
+
+    address owner;
+
+    // Price of lottery admission
+    uint price;
+
+
+    //ID for players in mapping and array
+    uint id; 
+
+    // Stores the players and their respective address by a dynamic uint identifier
+    mapping(uint => Player) public players;
+    struct Player {
+        address payable playerAddress;
+    }
+    
+    // Creates an array of the players that have entered for the generation of a random number within the length of the array
+    Player[] playerArray;
+
+// Constructor Function  
+    // Sets the owner and price of lottery admission 
+    constructor() {
+        owner = msg.sender;
+        price = .01 ether;
+        id = 0;
+    } 
+
+// Modifiers
+
+    // Requires that the correct amount of ether is paid
+    modifier purchasePrice {
+        require(msg.value == price);
+        _;
+    }
+    // Requires that the player has an ethereum address 
+    modifier hasAddress {
+        require (msg.sender != address(0x0));
+        _;
+    }
+
+// Functions
+
+    // Enter Lottery
+    function enterLottery() public payable purchasePrice() hasAddress() {
+        players[id] = Player(payable(msg.sender));
+        Player memory newPlayer = players[id];
+        playerArray.push(newPlayer);
+        id += 1;
+    }
+
+    // (OPTIONAL) Get Pot balance 
+    function potBalance() public view returns(uint) {
+        return address(this).balance;
+    }
+
+    // (OPTIONAL) Get list of players 
+    function listOfPlayers() public view returns(Player memory) {
+        for (uint i = 0; i < playerArray.length; i++) {
+            return players[i];
+        }
+    }
+
+    // Get Random Number
+    function getRandomNumber() private view returns(uint) {
+        return uint(keccak256(abi.encode(owner, block.timestamp)));
+    }
+
+    // Pick winner and send them entire pot amount
+    function pickWinner() public payable returns(uint) {
+        uint winningNumber = getRandomNumber() % playerArray.length;  
+        players[winningNumber].playerAddress.transfer(address(this).balance);
+    }
+
+
+
+
+}
+
