@@ -30,7 +30,13 @@ contract Lottery {
     }
     // Requires that the player has an ethereum address 
     modifier hasAddress {
-        require (msg.sender != address(0x0));
+        require(msg.sender != address(0x0));
+        _;
+    }
+
+    // Requires only the owner can call the function
+    modifier onlyOwner {
+        require(msg.sender == owner);
         _;
     }
 
@@ -47,10 +53,8 @@ contract Lottery {
     }
 
     // (OPTIONAL) Get list of players 
-    function listOfPlayers() public view returns(address) {
-        for (uint i = 0; i < playerArray.length; i++) {
-            return playerArray[i];
-        }
+    function listOfPlayers() public view returns(address payable[] memory) {
+            return playerArray;
     }
 
     // Get Random Number by using Keccak256 hash function encoding the paramaters owner and block timestamp
@@ -60,9 +64,13 @@ contract Lottery {
     }
 
     // Pick winner by generating a number within the array length by using modulo and send them entire pot amount
-    function pickWinner() public payable returns(uint) {
+    function pickWinner() public payable onlyOwner() returns(uint) {
         uint winningNumber = getRandomNumber() % playerArray.length;  
         playerArray[winningNumber].transfer(address(this).balance);
+
+        // Resets the state of the contract
+        playerArray = new address payable[](0); 
+
     }
 
 
