@@ -1,0 +1,72 @@
+// SPDX-License_Identifier: Unlicensed
+
+pragma solidity ^0.8.7;
+
+contract Lottery {
+
+// State Variables
+
+    address owner;
+
+    // Price of lottery admission
+    uint price;
+
+    // Creates an array of the addresses of each player
+    address[] payable playerArray;
+
+// Constructor Function  
+    // Sets the owner and price of lottery admission 
+    constructor() {
+        owner = msg.sender;
+        price = .01 ether;
+    } 
+
+// Modifiers
+
+    // Requires that the correct amount of ether is paid
+    modifier purchasePrice {
+        require(msg.value == price);
+        _;
+    }
+    // Requires that the player has an ethereum address 
+    modifier hasAddress {
+        require (msg.sender != address(0x0));
+        _;
+    }
+
+// Functions
+
+    // Enter Lottery
+    function enterLottery() public payable purchasePrice() hasAddress() {
+        playerArray.push(payable(msg.sender));
+    }
+
+    // (OPTIONAL) Get Pot balance 
+    function potBalance() public view returns(uint) {
+        return address(this).balance;
+    }
+
+    // (OPTIONAL) Get list of players 
+    function listOfPlayers() public view returns(address memory) {
+        for (uint i = 0; i < playerArray.length; i++) {
+            return playerArray[i];
+        }
+    }
+
+    // Get Random Number by using Keccak256 hash function encoding the paramaters owner and block timestamp
+    function getRandomNumber() internal return(uint) {
+        i = Keccak256(abi.encodePacked(owner, block.timestamp));
+        return i
+    }
+
+    // Pick winner by generating a number within the array length by using modulo and send them entire pot amount
+    function pickWinner() public payable returns(uint) {
+        uint winningNumber = getRandomNumber() % playerArray.length;  
+        playerArray[winningNumber].transfer(address(this).balance);
+    }
+
+
+
+
+}
+
