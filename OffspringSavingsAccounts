@@ -1,0 +1,89 @@
+// SPDX-License_Identifier: Unlicensed
+
+pragma solidity ^0.8.7;
+
+// Beginning of Smart Contract
+contract cryptoKids {
+
+// State Variables 
+
+    // Grandparent as the owner 
+    address owner;
+
+    // Mapping of Kids name to Kid struct object
+    mapping(string => Kid) public kids;
+    struct Kid {
+        string firstName;
+        string lastName;
+        uint releaseDate;
+        uint balance;
+        address payable account;
+    }
+
+// Modifiers 
+
+    modifier onlyOwner {
+        require(msg.sender == owner, "Only the creator of the smart contract can do that");
+        _;
+    }
+
+    modifier onlyKid(string memory _firstName) {
+        require(msg.sender == kids[_firstName].account, "Only the owner of that account can do that");
+        _;
+    }
+
+    modifier canWithdraw(string memory _firstName) {
+        require(block.timestamp >= kids[_firstName].releaseDate, "You are too young to withdraw");
+        _;
+    }
+
+//Events
+
+    event SuccessfullyWithdrewFunds (string _firstName, uint _amount);
+
+    event accountCredited ( string _firstName, uint amount);
+
+
+// Constructor Function 
+    constructor () {
+        owner = msg.sender;
+    }
+
+// Functions
+
+    // Add's a kid to the mapping database and creates their account profile 
+    function addKid(string memory _firstName, string memory _lastName, uint _releaseDate, uint _balance, address payable _account) public onlyOwner() {
+        kids[_firstName] = Kid(_firstName, _lastName, _releaseDate, _balance * 1 ether, payable(_account));
+    }
+
+    // Sends funds to this smart contract for holding while simultaneously updating specific kid's account with the amount they are entitled to
+    function depositFunds(string memory _firstName) public payable onlyOwner() {
+        kids[_firstName].balance = msg.value * 1 ether;
+        emit accountCredited(_firstName, msg.value);
+    }
+
+    // A read only function to allow a kid to check if they can withdraw 
+    function canKidWithdraw(string memory _firstName) public view canWithdraw(_firstName) returns(string memory) {
+        return "Congratulations, you can withdraw your funds" ;
+    }
+
+    // Withdraw Funds entitled to a child from smart contract to their account
+    function withdrawFunds(string memory _firstName) public payable onlyKid(_firstName) canWithdraw(_firstName) {
+        (bool sent, bytes memory data) = kids[_firstName].account.call{ value : (kids[_firstName].balance - 0.01 ether) } ("");
+        require(sent == true); 
+        emit SuccessfullyWithdrewFunds(_firstName, kids[_firstName].balance);
+        kids[_firstName].balance = 0;
+    }
+
+    // Withdraw partial amount of available funds
+    function withdrawPartial(string memory _firstName, uint _amount) public payable onlyKid(_firstName) {
+        require(_amount * 1 ether <= kids[_firstName].balance, "Not enough funds in your account");
+
+        kids[_firstName].account.transfer(_amount * 1 ether);
+        kids[_firstName].balance -= (_amount * 1 ether);
+
+        emit SuccessfullyWithdrewFunds(_firstName, _amount);
+    }    
+
+    
+}
