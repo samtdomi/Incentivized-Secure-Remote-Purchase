@@ -1,0 +1,82 @@
+pragma solidity ^0.8.14;
+
+import "./Ownable.sol";
+
+
+contract RentalAgreement is Ownable {
+    
+// State Variables
+
+    uint public rentAmount;
+
+    enum State {Created, Started, Terminated}
+    State state;
+
+    uint public leaseLength;
+
+    address payable tenant;
+
+    uint remainingBalance;
+
+    mapping(string => monthlyRentFacts) public monthlyHistory;
+    struct monthlyRentFacts {
+        uint amountPaid;
+        string rentStatus;
+    }
+
+
+    
+
+// Functions 
+
+    // Landlord sets the term of the lease and lease is "Created"
+    function createLease(uint _rentAmount, uint _leaseLength) public onlyOwner {
+        rentAmount = _rentAmount * (1 ether);
+        remainingBalance = rentAmount;
+        leaseLength = _leaseLength;
+        state = State.Created;
+    }
+
+    // Tenant starts the lease and captures their address as the tenant for the lease 
+    function tenantSignLease() public {
+        require(state == State.Created);
+        tenant = payable(msg.sender);
+        state = State.Started;
+    }
+
+    // Check to see remaining balance
+    function remainderForTheMonth() public view returns(uint) {
+        return remainingBalance;
+    }
+
+    // Tenant pays rent
+    function payRent(string memory _month) public payable {
+        require(state == State.Started);
+
+        uint paid = msg.value;
+        remainingBalance -= paid;
+        
+        if (remainingBalance == 0) {
+            monthlyHistory[_month] = monthlyRentFacts(rentAmount - remainingBalance, "Paid");
+            leaseLength--;
+            remainingBalance = rentAmount;
+        }
+
+        if (leaseLength == 0) {
+            state = State.Terminated;
+        }
+    }
+
+    // Landlord can withdraw funds 
+    function landlordWithdraw() public payable onlyOwner {
+        payable(msg.sender).transfer(address(this).balance);
+    }
+
+
+
+
+
+
+
+
+}
