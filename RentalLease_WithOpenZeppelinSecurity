@@ -3,20 +3,40 @@ pragma solidity ^0.8.14;
 import "./Ownable.sol";
 
 
-contract RentalAgreement is Ownable {
-    
-// State Variables
+/// @title Rental Agreement 
+/// @author Samuel Troy Dominguez
+/// @notice This contract facilitates the creation and signing of a lease and the montlhy financial dependencies between landlord and tenant
 
+contract RentalAgreement is Ownable {
+
+    /// @notice This is the price of rent set by the landlord
+    /// @dev The price can be set ONLY by the deployer of the contract and ONLY if the lease hasnt begun
+    /// @return Price of monthly rent
     uint public rentAmount;
 
     enum State {Created, Started, Terminated}
     State state;
 
+    /// @dev Length of lease begins with the total amount of months and subtracts 1 after each month
+    /// @return Integer representing the amount of months remaining on the lease 
     uint public leaseLength;
+
+    uint lateFee;
 
     address payable tenant;
 
     uint remainingBalance;
+
+    /// @return Unix time stamp of approximately the first day of each new month
+    /// @dev Starts out the same as the startDate to represent the beginning of the first month 
+    /// @dev Used to approximate a three day pay period before assessing late fee's and ensure payments are made for the correct month
+    /// @dev Updated after the completion of payment for any current month
+    uint public currentMonth;
+
+    /// @notice The unix time stamp representing the first day of the beginning month of the lease 
+    uint public startDate;
+
+    string startMonth;
 
     mapping(string => monthlyRentFacts) public monthlyHistory;
     struct monthlyRentFacts {
@@ -24,42 +44,93 @@ contract RentalAgreement is Ownable {
         string rentStatus;
     }
 
+    enum NewPeriod {Open, Closed}
+    NewPeriod newPeriod;
 
-    
+    uint payPeriod;
 
-// Functions 
 
-    // Landlord sets the term of the lease and lease is "Created"
-    function createLease(uint _rentAmount, uint _leaseLength) public onlyOwner {
+
+    /// @notice Verifies that the tenant is making payments for the correct current month
+    /// @dev Checks if the payment is being made within the current month and assumes a 30 day month
+    modifier correctMonth() {
+        require(block.timestamp >= currentMonth && (block.timestamp <= (currentMonth + 30 days)), "You can only do that for the current month");
+        _;
+    }
+
+
+    /// @notice Landlord enters the terms of the lease contract and its beginning date
+    /// @dev Requires that the Landlord can only call the function if the lease has not started, if the state is Terminated or Created
+    /// @param _rentAmount Price of monthly rent 
+    /// @param _lateFee Price of the late fee to be added on if payment is after pay period
+    /// @param _leaseLength Amount of months that the lease will last, and has remaining 
+    /// @param _unixStartDate Unix timestamp of the first day of the the month that the lease begins on
+    /// @param _startMonth Name of the month that the lease begins on
+    /// @param _payPeriod Number of days at beginning of month that the tenant has to pay full balane of rent before a late fee is assessed
+    function createLease(uint _rentAmount, uint _lateFee, uint _leaseLength, uint _unixStartDate, string memory _startMonth, uint _payPeriod) public onlyOwner {
+        require(state != State.Started);
         rentAmount = _rentAmount * (1 ether);
         remainingBalance = rentAmount;
+        lateFee = _lateFee * (1 ether);
         leaseLength = _leaseLength;
+        startDate = _unixStartDate;
+        currentMonth = startDate;
+        startMonth = _startMonth;
+        payPeriod = _payPeriod;
         state = State.Created;
     }
 
-    // Tenant starts the lease and captures their address as the tenant for the lease 
-    function tenantSignLease() public {
+    /// @notice Tenant saves their address identifying them as the tenant and the lease is started 
+    /// @dev Requires that the state of the lease is Created and hasnt started yet and proceeds to change the state to Started 
+    function tenantSignLease() public correctMonth() {
         require(state == State.Created);
         tenant = payable(msg.sender);
         state = State.Started;
+
     }
 
-    // Check to see remaining balance
+    /// @return Remaining balance for the current month 
+    /// @notice Check to see an up to date remaining balance for the current month
     function remainderForTheMonth() public view returns(uint) {
         return remainingBalance;
     }
 
-    // Tenant pays rent
-    function payRent(string memory _month) public payable {
+    /// @notice Tenant makes a rent payment either partailly or entirely and specifies the name of the month
+    /// @param _month Name of the current month
+    /// @dev Requires that the lease is in the started state 
+    /// @dev Requires that the payment is being made within and thus for the current month
+    /** @dev First IF statement adds a late fee to the remaining balance for the month if 
+        there is a remaining balance after the designated amount of days, specified by payPeriod,
+        after the beginning of the month 
+    */
+    /** @dev Second IF checks if the entire rent balance is paid for the month, then 
+        adds Paid Month to mapping of completed months, reduces the amount of months
+        remaining on the lease by 1, resets the remainingBalance for a month to 
+        the full price of monthly rent for the next month, and adds 30 days to 
+        currentMonth to allow the contract to switch to the next month 
+    */
+    /// @dev Third IF terminates the lease when the final month is completely paid 
+    function payRent(string memory _month) public payable correctMonth {
         require(state == State.Started);
 
         uint paid = msg.value;
         remainingBalance -= paid;
+
+        // Only allows a late fee to be assesed once per month
+        if(newPeriod != NewPeriod.Closed) {
+            if(block.timestamp > (currentMonth + (1 days * payPeriod))) {
+                if(remainingBalance != 0) {
+                    remainingBalance += lateFee;
+                    newPeriod = NewPeriod.Closed;
+                }
+            }
+        }
         
         if (remainingBalance == 0) {
-            monthlyHistory[_month] = monthlyRentFacts(rentAmount - remainingBalance, "Paid");
+            monthlyHistory[_month] = monthlyRentFacts(0, "Paid");
             leaseLength--;
             remainingBalance = rentAmount;
+            currentMonth = currentMonth + (1 days * 30);
         }
 
         if (leaseLength == 0) {
@@ -67,16 +138,11 @@ contract RentalAgreement is Ownable {
         }
     }
 
-    // Landlord can withdraw funds 
+    /// @notice Landlord withdraws rent payment funds from the smart contract 
+    /// @dev Requires only the landlord/deployer of the contract can withdraw funds to their address
     function landlordWithdraw() public payable onlyOwner {
         payable(msg.sender).transfer(address(this).balance);
     }
-
-
-
-
-
-
 
 
 }
